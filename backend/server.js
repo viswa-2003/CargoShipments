@@ -5,7 +5,12 @@ const cors = require('cors');
 require('dotenv').config();
 const dbUrl = process.env.MONGO_URI;
 const app = express();
-
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
 // Middleware
 app.use(cors());
 app.use(express.json());
