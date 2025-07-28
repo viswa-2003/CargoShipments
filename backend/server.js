@@ -15,6 +15,9 @@ app.get('/cargotracker', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+app.get('/', (req, res) => {
+  res.send('Cargo Tracker API is running!');
+});
 // Routes
 app.use('/api/shipments', require('./routes/shipmentRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
