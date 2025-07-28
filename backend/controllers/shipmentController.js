@@ -2,37 +2,193 @@ const Shipment = require('../models/shipmentModel');
 
 // Get all shipments
 exports.getAllShipments = async (req, res) => {
-  const shipments = await Shipment.find();
-  res.json(shipments);
+  try {
+    const shipments = await Shipment.find().sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      count: shipments.length,
+      data: shipments
+    });
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching shipments',
+      error: error.message
+    });
+  }
 };
 
 // Get shipment by ID
 exports.getShipmentById = async (req, res) => {
-  const shipment = await Shipment.findById(req.params.id);
-  res.json(shipment);
+  try {
+    const shipment = await Shipment.findById(req.params.id);
+    if (!shipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shipment not found'
+      });
+    }
+    res.status(200).json({
+      success: true,
+      data: shipment
+    });
+  } catch (error) {
+    console.error('Error fetching shipment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching shipment',
+      error: error.message
+    });
+  }
 };
 
 // Create new shipment
 exports.createShipment = async (req, res) => {
-  const shipment = new Shipment(req.body);
-  await shipment.save();
-  res.json(shipment);
+  try {
+    let route = req.body.route;
+    if (typeof route === 'string') {
+      route = route.split(',').map(item => item.trim()).filter(item => item);
+    }
+
+    if (!Array.isArray(route) || route.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Route must be an array with at least 2 ports'
+      });
+    }
+
+    const shipmentData = {
+      ...req.body,
+      route: route,
+      currentLocation: req.body.currentLocation || route[0],
+      status: req.body.status || 'Pending'
+    };
+
+    if (req.file) {
+      shipmentData.image = req.file.path;
+    }
+
+    const shipment = new Shipment(shipmentData);
+    await shipment.save();
+
+    res.status(201).json({
+      success: true,
+      data: shipment
+    });
+  } catch (error) {
+    console.error('Error creating shipment:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipment ID or Container ID already exists'
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: Object.values(error.errors).map(err => err.message)
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
 };
 
 // Update location
 exports.updateLocation = async (req, res) => {
-  const { currentLocation } = req.body;
-  const shipment = await Shipment.findByIdAndUpdate(
-    req.params.id,
-    { currentLocation },
-    { new: true }
-  );
-  res.json(shipment);
+  try {
+    const { currentLocation } = req.body;
+    if (!currentLocation) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current location is required'
+      });
+    }
+
+    const shipment = await Shipment.findByIdAndUpdate(
+      req.params.id,
+      { currentLocation },
+      { new: true }
+    );
+
+    if (!shipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shipment not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: shipment
+    });
+  } catch (error) {
+    console.error('Error updating location:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating location',
+      error: error.message
+    });
+  }
 };
 
-// Get ETA (mock logic)
+// Get ETA
 exports.getETA = async (req, res) => {
-  const shipment = await Shipment.findById(req.params.id);
-  shipment.currentETA = '2025-07-25T12:00:00Z'; // Placeholder
-  res.json({ eta: shipment.currentETA });
+  try {
+    const shipment = await Shipment.findById(req.params.id);
+    if (!shipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shipment not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        currentETA: shipment.currentETA,
+        estimatedDeliveryTime: shipment.estimatedDeliveryTime
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching ETA:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching ETA',
+      error: error.message
+    });
+  }
+};
+
+// Delete shipment
+exports.deleteShipment = async (req, res) => {
+  try {
+    const shipment = await Shipment.findByIdAndDelete(req.params.id);
+    if (!shipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shipment not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Shipment deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting shipment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting shipment',
+      error: error.message
+    });
+  }
 };
