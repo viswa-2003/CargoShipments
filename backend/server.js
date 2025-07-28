@@ -9,15 +9,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.get('/cargotracker', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK',
-    timestamp: new Date().toISOString()
-  });
-});
-app.get('/', (req, res) => {
-  res.send('Cargo Tracker API is running!');
-});
 // Routes
 app.use('/api/shipments', require('./routes/shipmentRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
