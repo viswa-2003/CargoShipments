@@ -13,7 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "engines": {
-    "node": ">=18.0.0"  // Added to specify Node version
+    "node": ">=18.0.0"  
   },
   "dependencies": {
     "cors": "^2.8.5",
