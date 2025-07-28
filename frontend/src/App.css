@@ -1,0 +1,53 @@
+/* App.css */
+.glitter-background {
+  position: relative;
+  background-color: #ffffff;
+}
+
+.glitter-overlay {
+  background-image: radial-gradient(#facc15 1px, transparent 1px),
+    radial-gradient(#facc15 1px, transparent 1px);
+  background-size: 30px 30px;
+  background-position: 0 0, 15px 15px;
+  opacity: 0.3;
+  animation: glitterMove 8s linear infinite;
+}
+
+@keyframes glitterMove {
+  from {
+    background-position: 0 0, 15px 15px;
+  }
+  to {
+    background-position: 60px 60px, 75px 75px;
+  }
+}
+/* Glitter background animation */
+.glitter-background {
+  background: linear-gradient(120deg, #ffffff 0%, #0037ae 100%);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sparkle overlay using pseudo particles */
+.glitter-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(white 1px, transparent 1px),
+                    radial-gradient(white 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  opacity: 0.07;
+  animation: sparkleMove 20s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes sparkleMove {
+  0% {
+    background-position: 0 0, 10px 10px;
+  }
+  100% {
+    background-position: 100px 100px, 110px 110px;
+  }
+}
