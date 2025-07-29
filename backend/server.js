@@ -57,7 +57,7 @@ app.use('/api/shipments', require('./routes/shipmentRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check Endpoint
-app.get('/health', (req, res) => {
+app.get('/healthz', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
