@@ -1,27 +1,106 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const cors = require('cors');
-require('dotenv').config();
-const dbUrl = process.env.MONGO_URI;
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+
 const app = express();
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-// Routes
-app.use('/api/shipments', require('./routes/shipmentRoutes'));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// Database connection
+
+// ======================
+// Enhanced Security Middleware
+// ======================
+app.use(helmet()); // Security headers
+app.use(mongoSanitize()); // Prevent NoSQL injection
+app.use(express.json({ limit: '10kb' })); // Body limit
+
+// Rate limiting (100 requests per 15 minutes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
+app.use('/api', limiter);
+
+// CORS Configuration
+const corsOptions = {
+  origin: [
+    process.env.FRONTEND_URL, 
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+// ======================
+// Database Connection
+// ======================
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s
+  retryWrites: true,
+  w: 'majority'
 })
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => console.log('MongoDB connected successfully'))
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1); // Exit process on DB connection failure
+});
 
-// Server
+// ======================
+// Routes
+// ======================
+app.use('/api/shipments', require('./routes/shipmentRoutes'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date()
+  });
+});
+
+// ======================
+// Error Handling
+// ======================
+// 404 Handler
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Server Error:', err.stack);
+  res.status(500).json({
+    success: false,
+    message: 'Internal Server Error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// ======================
+// Server Initialization
+// ======================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+});
+
+// Graceful Shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    mongoose.connection.close(false, () => {
+      console.log('Server and MongoDB connection closed');
+      process.exit(0);
+    });
+  });
 });
