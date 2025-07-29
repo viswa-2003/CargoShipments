@@ -42,10 +42,7 @@ app.use('/api', limiter);
 
 // CORS Configuration
 const corsOptions = {
-  origin: [
-    process.env.FRONTEND_URL, 
-    'http://localhost:3000'
-  ],
+  origin: ["https://cargo-frontend-hdrr.onrender.com", "http://localhost:3000"],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -73,6 +70,15 @@ app.get('/healthz', (req, res) => {
     status: 'healthy',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     timestamp: new Date()
+  });
+});
+// Add this before your 404 handler
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Cargo Shipment Tracker API',
+    version: '1.0.0',
+    documentation: 'https://your-docs-link.com' // Optional
   });
 });
 

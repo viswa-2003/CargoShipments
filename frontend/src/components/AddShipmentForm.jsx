@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-
+import { getApiUrl } from '../config';;
 const AddShipmentForm = () => {
   const [formData, setFormData] = useState({
     shipmentId: '',
@@ -60,7 +60,7 @@ const AddShipmentForm = () => {
     }
 
     try {
-      await axios.post('http://localhost:5000/api/shipments', data, {
+      await axios.post(getApiUrl('/shipments'), data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 

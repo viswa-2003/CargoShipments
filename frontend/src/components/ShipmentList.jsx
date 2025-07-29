@@ -4,6 +4,9 @@ import axios from 'axios';
 import { FaMapMarkerAlt, FaTrashAlt, FaShip, FaClock, FaCalendarAlt } from 'react-icons/fa';
 import PropTypes from 'prop-types';
 import SeaMapModal from './SeaMapModal';
+import { getUploadsUrl } from '../config';
+import { getShipmentUrl } from '../config';
+import { getApiUrl } from '../config';
 
 const ImageWithFallback = ({ src, alt, className }) => {
   const [imgSrc, setImgSrc] = useState(src);
@@ -35,11 +38,7 @@ ImageWithFallback.propTypes = {
   className: PropTypes.string
 };
 
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  const filename = imagePath.replace(/^.*[\\/]/, '');
-  return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/uploads/${encodeURIComponent(filename)}`;
-};
+const getImageUrl = (imagePath) => getUploadsUrl(imagePath);
 
 const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
@@ -51,7 +50,7 @@ const ShipmentList = () => {
   const fetchShipments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/shipments`);
+      const response = await axios.get(getApiUrl('shipments'));
       const uniqueShipments = Array.from(
         new Map(response.data.data.map(item => [item._id, item])).values()
       );
@@ -73,7 +72,7 @@ const ShipmentList = () => {
     if (!confirmDelete) return;
 
     try {
-      await axios.delete(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/shipments/${id}`);
+      await axios.delete(getShipmentUrl(id));
       setShipments(prev => prev.filter(shipment => shipment._id !== id));
     } catch (err) {
       console.error("Error deleting shipment:", err);
