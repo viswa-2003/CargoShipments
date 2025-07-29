@@ -1,51 +1,27 @@
 const Shipment = require('../models/shipmentModel');
+const path = require('path');
+const fs = require('fs');
 
-// Get all shipments
-exports.getAllShipments = async (req, res) => {
-  try {
-    const shipments = await Shipment.find().sort({ createdAt: -1 });
-    res.status(200).json({
-      success: true,
-      count: shipments.length,
-      data: shipments
-    });
-  } catch (error) {
-    console.error('Error fetching shipments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching shipments',
-      error: error.message
-    });
-  }
-};
-
-// Get shipment by ID
-exports.getShipmentById = async (req, res) => {
-  try {
-    const shipment = await Shipment.findById(req.params.id);
-    if (!shipment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Shipment not found'
-      });
-    }
-    res.status(200).json({
-      success: true,
-      data: shipment
-    });
-  } catch (error) {
-    console.error('Error fetching shipment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching shipment',
-      error: error.message
-    });
-  }
-};
-
+// ============================
 // Create new shipment
+// ============================
 exports.createShipment = async (req, res) => {
   try {
+    // Handle file validation errors
+    if (req.fileValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: req.fileValidationError
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload an image file'
+      });
+    }
+
     let route = req.body.route;
     if (typeof route === 'string') {
       route = route.split(',').map(item => item.trim()).filter(item => item);
@@ -66,19 +42,31 @@ exports.createShipment = async (req, res) => {
     };
 
     if (req.file) {
-      shipmentData.image = req.file.path;
+      shipmentData.image = req.file.filename;
     }
 
     const shipment = new Shipment(shipmentData);
     await shipment.save();
 
+    const shipmentObj = shipment.toObject();
+    if (shipmentObj.image) {
+      shipmentObj.image = `${req.protocol}://${req.get('host')}/uploads/${shipmentObj.image}`;
+    }
+
     res.status(201).json({
       success: true,
-      data: shipment
+      data: shipmentObj
     });
   } catch (error) {
     console.error('Error creating shipment:', error);
-    
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File size too large (max 10MB)'
+      });
+    }
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -102,7 +90,71 @@ exports.createShipment = async (req, res) => {
   }
 };
 
-// Update location
+// ============================
+// Get all shipments
+// ============================
+exports.getAllShipments = async (req, res) => {
+  try {
+    const shipments = await Shipment.find().sort({ createdAt: -1 });
+
+    const shipmentsWithImageUrls = shipments.map(shipment => {
+      const shipmentObj = shipment.toObject();
+      if (shipmentObj.image) {
+        shipmentObj.image = `${req.protocol}://${req.get('host')}/uploads/${shipmentObj.image}`;
+      }
+      return shipmentObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: shipmentsWithImageUrls.length,
+      data: shipmentsWithImageUrls
+    });
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching shipments',
+      error: error.message
+    });
+  }
+};
+
+// ============================
+// Get shipment by ID
+// ============================
+exports.getShipmentById = async (req, res) => {
+  try {
+    const shipment = await Shipment.findById(req.params.id);
+    if (!shipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shipment not found'
+      });
+    }
+
+    const shipmentObj = shipment.toObject();
+    if (shipmentObj.image) {
+      shipmentObj.image = `${req.protocol}://${req.get('host')}/uploads/${shipmentObj.image}`;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: shipmentObj
+    });
+  } catch (error) {
+    console.error('Error fetching shipment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching shipment',
+      error: error.message
+    });
+  }
+};
+
+// ============================
+// Update current location
+// ============================
 exports.updateLocation = async (req, res) => {
   try {
     const { currentLocation } = req.body;
@@ -140,7 +192,9 @@ exports.updateLocation = async (req, res) => {
   }
 };
 
+// ============================
 // Get ETA
+// ============================
 exports.getETA = async (req, res) => {
   try {
     const shipment = await Shipment.findById(req.params.id);
@@ -168,15 +222,32 @@ exports.getETA = async (req, res) => {
   }
 };
 
-// Delete shipment
+// ============================
+// Delete shipment with image cleanup
+// ============================
 exports.deleteShipment = async (req, res) => {
   try {
     const shipment = await Shipment.findByIdAndDelete(req.params.id);
+
     if (!shipment) {
       return res.status(404).json({
         success: false,
         message: 'Shipment not found'
       });
+    }
+
+    // Delete associated image file if exists
+    if (shipment.image) {
+      const imagePath = path.join(__dirname, '../uploads', shipment.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlink(imagePath, (err) => {
+          if (err) {
+            console.error('Error deleting image file:', err);
+          } else {
+            console.log('Deleted image file:', shipment.image);
+          }
+        });
+      }
     }
 
     res.status(200).json({

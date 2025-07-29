@@ -7,7 +7,7 @@ const shipmentSchema = new mongoose.Schema({
   currentLocation: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ['Pending', 'In transit', 'Delayed', 'Delivered', 'Received'],
+    enum: ['Pending', 'In Transit', 'Delayed', 'Delivered', 'Received'], // Updated to match "In Transit"
     default: 'Pending'
   },
   image: { type: String },

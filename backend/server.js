@@ -8,12 +8,29 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 
 const app = express();
-
+// Add this near your other middleware
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, path) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Cache-Control', 'public, max-age=31536000');
+  }
+}));
 // ======================
 // Enhanced Security Middleware
 // ======================
 app.use(helmet()); // Security headers
-app.use(mongoSanitize()); // Prevent NoSQL injection
+
+// Updated mongoSanitize configuration
+app.use(
+  mongoSanitize({
+    replaceWith: '_',
+    onSanitize: ({ req, key }) => {
+      console.warn(`Sanitized ${key} on request ${req.method} ${req.url}`);
+    },
+  })
+);
+
 app.use(express.json({ limit: '10kb' })); // Body limit
 
 // Rate limiting (100 requests per 15 minutes)
@@ -37,17 +54,11 @@ app.use(cors(corsOptions));
 // ======================
 // Database Connection
 // ======================
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000, // Timeout after 5s
-  retryWrites: true,
-  w: 'majority'
-})
+mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => {
   console.error('MongoDB connection error:', err);
-  process.exit(1); // Exit process on DB connection failure
+  process.exit(1);
 });
 
 // ======================
@@ -69,7 +80,7 @@ app.get('/healthz', (req, res) => {
 // Error Handling
 // ======================
 // 404 Handler
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found'

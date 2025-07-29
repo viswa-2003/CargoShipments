@@ -1,22 +1,66 @@
+// ShipmentList.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FaMapMarkerAlt, FaTrashAlt, FaShip, FaClock, FaCalendarAlt } from 'react-icons/fa';
+import PropTypes from 'prop-types';
 import SeaMapModal from './SeaMapModal';
+
+const ImageWithFallback = ({ src, alt, className }) => {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <div className={`${className} ${hasError ? 'bg-gray-100 flex items-center justify-center' : ''}`}>
+      {hasError ? (
+        <span className="text-gray-500">Image not available</span>
+      ) : (
+        <img
+          src={imgSrc}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={() => {
+            setHasError(true);
+            setImgSrc('/placeholder.jpg');
+          }}
+          loading="lazy"
+        />
+      )}
+    </div>
+  );
+};
+
+ImageWithFallback.propTypes = {
+  src: PropTypes.string,
+  alt: PropTypes.string,
+  className: PropTypes.string
+};
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  const filename = imagePath.replace(/^.*[\\/]/, '');
+  return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/uploads/${encodeURIComponent(filename)}`;
+};
 
 const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
   const [openMapFor, setOpenMapFor] = useState(null);
   const [selectedShipment, setSelectedShipment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchShipments = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/shipments');
-      const unique = Array.from(
+      setLoading(true);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/shipments`);
+      const uniqueShipments = Array.from(
         new Map(response.data.data.map(item => [item._id, item])).values()
       );
-      setShipments(unique);
-    } catch (error) {
-      console.error('Error fetching shipments:', error);
+      setShipments(uniqueShipments);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching shipments:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -27,45 +71,66 @@ const ShipmentList = () => {
   const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this shipment?");
     if (!confirmDelete) return;
+
     try {
-      await axios.delete(`http://localhost:5000/api/shipments/${id}`);
-      alert("Shipment deleted successfully");
+      await axios.delete(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/shipments/${id}`);
       setShipments(prev => prev.filter(shipment => shipment._id !== id));
-    } catch (error) {
-      console.error("Error deleting shipment:", error);
+    } catch (err) {
+      console.error("Error deleting shipment:", err);
+      alert("Failed to delete shipment");
     }
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'In transit': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Delivered': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Delayed': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Pending': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'Received': return 'bg-purple-100 text-purple-800 border-purple-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
+    const statusMap = {
+      'In transit': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'Delivered': 'bg-green-100 text-green-800 border-green-200',
+      'Delayed': 'bg-red-100 text-red-800 border-red-200',
+      'Pending': 'bg-gray-100 text-gray-800 border-gray-200',
+      'Received': 'bg-purple-100 text-purple-800 border-purple-200'
+    };
+    return statusMap[status] || 'bg-blue-100 text-blue-800 border-blue-200';
   };
 
   const openMapModal = (shipmentId) => {
     const shipment = shipments.find(s => s._id === shipmentId);
-    setSelectedShipment(shipment);
-    setOpenMapFor(shipmentId);
+    if (shipment) {
+      setSelectedShipment(shipment);
+      setOpenMapFor(shipmentId);
+    }
   };
 
   const formatTimeRemaining = (eta) => {
     if (!eta) return 'Calculating...';
-
     const now = new Date();
     const diff = new Date(eta) - now;
-
     if (diff <= 0) return 'Arrived';
-
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
     return `${days}d ${hours}h remaining`;
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-10">
+        <p className="text-red-500">Error loading shipments: {error}</p>
+        <button 
+          onClick={fetchShipments}
+          className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-gray-50">
@@ -91,13 +156,11 @@ const ShipmentList = () => {
               className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow border border-gray-100 overflow-hidden"
             >
               {shipment.image && (
-                <div className="h-48 overflow-hidden">
-                  <img
-                    src={`http://localhost:5000/uploads/${shipment.image.split('\\').pop()}`}
-                    alt="Cargo"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <ImageWithFallback 
+                  src={getImageUrl(shipment.image)}
+                  alt={`Cargo ${shipment.shipmentId}`}
+                  className="h-48 w-full"
+                />
               )}
 
               <div className="p-4">
@@ -149,6 +212,7 @@ const ShipmentList = () => {
                   <button
                     onClick={() => openMapModal(shipment._id)}
                     className="text-blue-500 hover:text-blue-700 flex items-center text-sm font-medium"
+                    aria-label="View route"
                   >
                     <FaMapMarkerAlt className="mr-1" /> View Route
                   </button>
@@ -156,6 +220,7 @@ const ShipmentList = () => {
                   <button
                     onClick={() => handleDelete(shipment._id)}
                     className="text-red-500 hover:text-red-700 flex items-center text-sm font-medium"
+                    aria-label="Delete shipment"
                   >
                     <FaTrashAlt className="mr-1" /> Delete
                   </button>

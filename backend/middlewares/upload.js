@@ -19,12 +19,15 @@ const fileFilter = (req, file, cb) => {
   if (mimetype && extname) {
     return cb(null, true);
   }
-  cb(new Error('Only image files are allowed!'));
+  cb(new Error('Only image files are allowed (JPEG, JPG, PNG, GIF)'));
 };
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { 
+    fileSize: 10 * 1024 * 1024, // 10MB limit (increased from 5MB)
+    files: 1 // Limit to 1 file
+  },
   fileFilter: fileFilter
 });
 
