@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { getApiUrl } from '../config';;
+import { getApiUrl } from '../config';
+
 const AddShipmentForm = () => {
   const [formData, setFormData] = useState({
     shipmentId: '',
@@ -36,38 +37,71 @@ const AddShipmentForm = () => {
     setLoading(true);
     setError('');
 
-    const data = new FormData();
-
-    // Copy formData and parse route into an array
-    const parsedData = {
-      ...formData,
-      route: formData.route.split(',').map((r) => r.trim())
-    };
-
-    Object.keys(parsedData).forEach((key) => {
-      if (Array.isArray(parsedData[key])) {
-        // Append arrays properly
-        parsedData[key].forEach((val) => {
-          data.append(`${key}[]`, val);
-        });
-      } else {
-        data.append(key, parsedData[key]);
-      }
-    });
-
-    if (image) {
-      data.append('image', image);
-    }
-
     try {
-      await axios.post(getApiUrl('/shipments'), data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      // Validate required fields
+      if (!formData.shipmentId || !formData.containerId || !formData.route) {
+        throw new Error('Please fill all required fields');
+      }
+
+      // Validate image if exists
+      if (image && !image.type.startsWith('image/')) {
+        throw new Error('Only image files are allowed');
+      }
+
+      const formDataToSend = new FormData();
+
+      // Append all form data
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'route') {
+          // Handle route array conversion
+          const routeArray = value.split(',').map(item => item.trim());
+          routeArray.forEach(item => formDataToSend.append('route[]', item));
+        } else {
+          formDataToSend.append(key, value);
+        }
       });
 
-      navigate('/shipments');
+      // Append image if exists
+      if (image) {
+        formDataToSend.append('image', image);
+      }
+
+      // Debug: Log FormData contents
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(key, value);
+      }
+
+      const response = await axios.post(getApiUrl('/shipments'), formDataToSend, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        navigate('/shipments');
+      } else {
+        throw new Error(response.data.message || 'Failed to create shipment');
+      }
     } catch (err) {
-      console.error('Error creating shipment:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to create shipment');
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        stack: err.stack
+      });
+
+      let errorMessage = 'Failed to create shipment';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      // Handle specific error cases
+      if (err.response?.data?.errors) {
+        errorMessage = err.response.data.errors.map(e => e.message).join(', ');
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

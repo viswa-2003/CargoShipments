@@ -38,7 +38,16 @@ ImageWithFallback.propTypes = {
   className: PropTypes.string
 };
 
-const getImageUrl = (imagePath) => getUploadsUrl(imagePath);
+// Remove or update getImageUrl function since we're using full Cloudinary URLs directly
+const getImageUrl = (imagePath) => {
+  // If it's already a full URL (starts with http), return as is
+  if (imagePath && (imagePath.startsWith('http://') || imagePath.startsWith('https://'))) {
+    return imagePath;
+  }
+  // If it's just a filename, it's probably a Cloudinary public_id, construct URL
+  // But with the backend fix, we should be getting full URLs
+  return imagePath ? getUploadsUrl(imagePath) : '';
+};
 
 const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
@@ -51,6 +60,13 @@ const ShipmentList = () => {
     try {
       setLoading(true);
       const response = await axios.get(getApiUrl('shipments'));
+      
+      // Debug: Check what image URLs we're receiving
+      console.log('Shipments data:', response.data.data);
+      if (response.data.data && response.data.data.length > 0) {
+        console.log('First shipment image:', response.data.data[0].image);
+      }
+      
       const uniqueShipments = Array.from(
         new Map(response.data.data.map(item => [item._id, item])).values()
       );
@@ -156,7 +172,7 @@ const ShipmentList = () => {
             >
               {shipment.image && (
                 <ImageWithFallback 
-                  src={getImageUrl(shipment.image)}
+                  src={shipment.image} // Use the image URL directly from backend
                   alt={`Cargo ${shipment.shipmentId}`}
                   className="h-48 w-full"
                 />
